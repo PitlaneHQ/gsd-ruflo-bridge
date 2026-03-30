@@ -12,6 +12,24 @@ Learn Codebase → Seed Ruflo Memory → GSD PLAN.md → Spawn Informed Swarm �
 
 Instead of a single GSD executor agent working sequentially through a phase, this skill spawns a coordinated team of specialized Ruflo agents that already understand your project's structure, patterns, and conventions.
 
+## Dependencies
+
+| Dependency | Version | Purpose |
+|-----------|---------|---------|
+| [GSD](https://github.com/get-stuff-done/gsd) | Latest | Structured phase planning, roadmaps, and verification |
+| [Ruflo CLI](https://github.com/ruvnet/ruflo) (`claude-flow`) | v3alpha+ | Multi-agent swarm orchestration and execution |
+| [Claude Code](https://claude.com/claude-code) | Latest | CLI environment for running skills and agents |
+
+### Install Dependencies
+
+```bash
+# Ruflo CLI (required)
+npx claude-flow@v3alpha --version
+
+# GSD skill (required — install via Claude Code)
+# See https://github.com/get-stuff-done/gsd for setup instructions
+```
+
 ## How It Works
 
 | Step | Action | Tool |
