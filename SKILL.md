@@ -1,6 +1,6 @@
 ---
 name: gsd-ruflo-bridge
-description: "Bridge GSD phase planning with Ruflo swarm execution. Use when executing a GSD phase with multi-agent swarms instead of a single executor, or when a phase has parallelizable tasks across 5+ files."
+description: "Bridge GSD phase planning with Ruflo swarm execution. Use when executing a GSD phase with multi-agent swarms instead of a single executor, or when a phase has parallelizable tasks across 5+ files. Also use to pre-learn a codebase so agents start with full project context."
 ---
 
 # GSD-Ruflo Bridge
@@ -8,6 +8,8 @@ description: "Bridge GSD phase planning with Ruflo swarm execution. Use when exe
 ## Overview
 
 Connects GSD's structured phase planning with Ruflo's multi-agent swarm execution. Instead of a single GSD executor agent working sequentially, this skill spawns a coordinated Ruflo swarm matched to the phase's task types.
+
+Includes a **memory seeding** system that pre-analyzes your codebase so agents already know your project's structure, patterns, frameworks, and history before they start working.
 
 **Announce at start:** "I'm using the gsd-ruflo-bridge skill to execute this phase with a Ruflo swarm."
 
@@ -17,6 +19,7 @@ Connects GSD's structured phase planning with Ruflo's multi-agent swarm executio
 - Phase touches 5+ files across different concerns (API + tests + docs)
 - Phase benefits from specialized agents (security review, architecture, testing)
 - You want multi-agent review/validation during execution
+- **New project**: Run `learn` first so agents start with full context
 
 ## When NOT to Use
 
@@ -30,6 +33,94 @@ Connects GSD's structured phase planning with Ruflo's multi-agent swarm executio
 - Ruflo CLI available: `npx claude-flow@v3alpha --version`
 - A GSD phase with a `PLAN.md` already created via `/gsd:plan-phase`
 - Active `.planning/` directory with roadmap
+
+---
+
+## Pre-Learning: Seed Memory Before Execution
+
+Before running any phase, teach the agents about your existing codebase. This only needs to happen once per project (or after major changes).
+
+### What Learn Captures
+
+| Memory Key | What It Stores |
+|-----------|----------------|
+| `structure-files` | Project file tree (up to 200 files, 3 levels deep) |
+| `structure-dirs` | Directory layout |
+| `code-patterns` | Languages, frameworks (React, Express, etc.), linting/formatting configs |
+| `architecture` | Entry points, key config files, package.json metadata |
+| `test-patterns` | Test framework (vitest/jest/pytest), test file locations, test count |
+| `git-history` | Recent 20 commits, most-changed files, contributors, current branch |
+| `doc-*` | First 100 lines of README, CLAUDE.md, CONTRIBUTING.md, etc. |
+
+### Deep Mode (--deep) adds:
+
+| Memory Key | What It Stores |
+|-----------|----------------|
+| `api-routes` | Files containing API route definitions |
+| `data-models` | Files with database models/schemas |
+| `import-graph` | Top 100 import statements showing module relationships |
+| `tech-debt` | TODO/FIXME/HACK/WORKAROUND markers across the codebase |
+
+### How to Run Learn
+
+**Option A: Via script**
+```bash
+# Basic learn (current directory)
+bash ~/.claude/skills/gsd-ruflo-bridge/scripts/learn.sh .
+
+# Deep learn with custom namespace
+bash ~/.claude/skills/gsd-ruflo-bridge/scripts/learn.sh /path/to/project --namespace my-project --deep
+```
+
+**Option B: Via Claude Code (recommended)**
+
+Tell Claude: "Learn this codebase for Ruflo" and it will run these steps:
+
+1. **Scan structure**: `find` the project tree, store in Ruflo memory
+2. **Detect patterns**: Identify languages, frameworks, configs
+3. **Map architecture**: Find entry points, key files, package metadata
+4. **Analyze tests**: Detect test framework, count test files, find test dirs
+5. **Read git history**: Recent commits, hot files, contributors
+6. **Ingest docs**: README, CLAUDE.md, and other documentation
+
+```bash
+# All stored under a namespace your agents can query
+npx claude-flow@v3alpha memory search --namespace project-memory --query "test framework"
+npx claude-flow@v3alpha memory search --namespace project-memory --query "architecture"
+npx claude-flow@v3alpha memory search --namespace project-memory --query "recent changes"
+```
+
+### How Agents Use Pre-Learned Memory
+
+When the bridge spawns agents in Step 4, each agent's prompt includes:
+
+```
+Read project context from Ruflo memory namespace 'project-memory':
+- Query 'architecture' for entry points and project structure
+- Query 'code-patterns' for languages and frameworks in use
+- Query 'test-patterns' for testing conventions
+- Query 'git-history' for recent changes and hot files
+
+Use this context to inform your work. Follow existing patterns.
+```
+
+This means:
+- **Architects** know the existing module structure before designing
+- **Developers** follow existing code conventions automatically
+- **Testers** use the correct test framework and file patterns
+- **Reviewers** check against established project patterns
+
+### Re-Learning
+
+Run learn again when:
+- Major refactoring changes project structure
+- New framework/dependency added
+- Switching branches to a different feature area
+- Starting a new milestone
+
+The `--upsert` flag ensures existing memories are updated, not duplicated.
+
+---
 
 ## The Process
 
@@ -113,13 +204,28 @@ npx claude-flow@v3alpha swarm start \
   --parallel true
 ```
 
-**Simultaneously**, use Claude Code's Agent tool to spawn real executor agents:
+**Simultaneously**, use Claude Code's Agent tool to spawn real executor agents. Each agent gets **pre-learned project context** from the `project-memory` namespace:
 
 ```
-Agent("Architect", "Read the GSD phase plan from .planning/..., design the implementation approach, store decisions in memory namespace 'gsd-phase'")
-Agent("Developer", "Implement tasks from the GSD phase plan. Read design from memory namespace 'gsd-phase'. Files to modify: [list from plan]")
-Agent("Tester", "Write tests for acceptance criteria from the GSD phase plan. Read criteria from memory namespace 'gsd-phase'")
-Agent("Reviewer", "Review all changes against the phase acceptance criteria. Report findings to memory namespace 'gsd-phase'")
+Agent("Architect", "
+  CONTEXT: Query Ruflo memory namespace 'project-memory' for: architecture, code-patterns, git-history.
+  TASK: Read the GSD phase plan from .planning/..., design the implementation approach.
+  Follow existing patterns found in project memory. Store decisions in namespace 'gsd-phase'.")
+
+Agent("Developer", "
+  CONTEXT: Query Ruflo memory namespace 'project-memory' for: code-patterns, test-patterns, architecture.
+  TASK: Implement tasks from the GSD phase plan. Read design from namespace 'gsd-phase'.
+  Match existing code style and framework conventions. Files to modify: [list from plan]")
+
+Agent("Tester", "
+  CONTEXT: Query Ruflo memory namespace 'project-memory' for: test-patterns, code-patterns.
+  TASK: Write tests for acceptance criteria from the GSD phase plan.
+  Use the project's test framework and follow existing test file patterns. Read criteria from namespace 'gsd-phase'")
+
+Agent("Reviewer", "
+  CONTEXT: Query Ruflo memory namespace 'project-memory' for: code-patterns, architecture, tech-debt.
+  TASK: Review all changes against the phase acceptance criteria.
+  Check for consistency with existing patterns. Report findings to namespace 'gsd-phase'")
 ```
 
 **Dependency ordering:**

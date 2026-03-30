@@ -4,23 +4,24 @@ Bridge between [GSD](https://github.com/get-stuff-done/gsd) structured phase pla
 
 ## What It Does
 
-GSD plans your work in phases. Ruflo executes with agent swarms. This skill connects them:
+GSD plans your work in phases. Ruflo executes with agent swarms. This skill connects them — and pre-teaches agents about your codebase before they start.
 
 ```
-GSD PLAN.md → Parse Tasks → Map to Agents → Ruflo Swarm → Results → GSD Verify
+Learn Codebase → Seed Ruflo Memory → GSD PLAN.md → Spawn Informed Swarm → Results → GSD Verify
 ```
 
-Instead of a single GSD executor agent working sequentially through a phase, this skill spawns a coordinated team of specialized Ruflo agents that work in parallel.
+Instead of a single GSD executor agent working sequentially through a phase, this skill spawns a coordinated team of specialized Ruflo agents that already understand your project's structure, patterns, and conventions.
 
 ## How It Works
 
 | Step | Action | Tool |
 |------|--------|------|
+| 0 | **Learn codebase** (once) | `learn.sh` or Claude |
 | 1 | Plan your phase | GSD (`/gsd:plan-phase`) |
 | 2 | Parse PLAN.md tasks | Bridge skill |
 | 3 | Map tasks to agent roles | Bridge skill |
 | 4 | Spawn Ruflo swarm | Ruflo CLI |
-| 5 | Execute in parallel | Ruflo agents |
+| 5 | Execute in parallel | Ruflo agents (with pre-loaded memory) |
 | 6 | Verify results | GSD (`/gsd:verify-work`) |
 
 ## Task-to-Agent Mapping
@@ -81,11 +82,53 @@ Or clone this repo directly:
 git clone https://github.com/PitlaneHQ/gsd-ruflo-bridge.git ~/.claude/skills/gsd-ruflo-bridge
 ```
 
-### Run It
+### Step 0: Learn Your Codebase (once per project)
+
+Before running any phase, teach the agents about your existing project:
+
+```bash
+# Basic learn (current directory)
+bash ~/.claude/skills/gsd-ruflo-bridge/scripts/learn.sh .
+
+# Deep learn with custom namespace
+bash ~/.claude/skills/gsd-ruflo-bridge/scripts/learn.sh /path/to/project --namespace my-project --deep
+```
+
+Or just tell Claude: **"Learn this codebase for Ruflo"**
+
+This scans and stores:
+
+| Memory Key | What It Captures |
+|-----------|-----------------|
+| `structure-files` | File tree (200 files, 3 levels deep) |
+| `structure-dirs` | Directory layout |
+| `code-patterns` | Languages, frameworks, linting configs |
+| `architecture` | Entry points, package.json, key configs |
+| `test-patterns` | Test framework, test locations, test count |
+| `git-history` | Recent commits, hot files, contributors |
+| `doc-*` | README, CLAUDE.md, CONTRIBUTING.md |
+
+**Deep mode** (`--deep`) also captures:
+
+| Memory Key | What It Captures |
+|-----------|-----------------|
+| `api-routes` | Files with API route definitions |
+| `data-models` | Database model/schema files |
+| `import-graph` | Module import relationships |
+| `tech-debt` | TODO/FIXME/HACK markers |
+
+Agents can then query this at any time:
+
+```bash
+npx claude-flow@v3alpha memory search --namespace project-memory --query "test framework"
+npx claude-flow@v3alpha memory search --namespace project-memory --query "architecture"
+```
+
+### Step 1-4: Run It
 
 ```
 1. /gsd:plan-phase           # Create your phase plan
-2. /gsd-ruflo-bridge          # Execute with Ruflo swarm
+2. /gsd-ruflo-bridge          # Execute with Ruflo swarm (agents read pre-loaded memory)
 3. /gsd:verify-work           # Verify the results
 4. /gsd:next                  # Move to next phase
 ```
