@@ -100,21 +100,46 @@ Or clone this repo directly:
 git clone https://github.com/PitlaneHQ/gsd-ruflo-bridge.git ~/.claude/skills/gsd-ruflo-bridge
 ```
 
-### Step 0: Learn Your Codebase (once per project)
+### Step 0: Learn & Setup (once per project)
 
-Before running any phase, teach the agents about your existing project:
+Run one command to set up GSD + seed Ruflo memory on any existing codebase:
 
 ```bash
-# Basic learn (current directory)
+# Full setup: GSD project + Ruflo memory (current directory)
 bash ~/.claude/skills/gsd-ruflo-bridge/scripts/learn.sh .
 
 # Deep learn with custom namespace
 bash ~/.claude/skills/gsd-ruflo-bridge/scripts/learn.sh /path/to/project --namespace my-project --deep
+
+# Memory only (skip GSD scaffolding)
+bash ~/.claude/skills/gsd-ruflo-bridge/scripts/learn.sh . --skip-gsd
 ```
 
 Or just tell Claude: **"Learn this codebase for Ruflo"**
 
-This scans and stores:
+#### Phase 1: GSD Project Setup (auto-generated)
+
+The script auto-detects your tech stack and creates:
+
+| File | What It Generates |
+|------|------------------|
+| `.planning/PROJECT.md` | Tech stack, build/test commands, project structure, constraints |
+| `.planning/ROADMAP.md` | Initial roadmap ready for `/gsd:add-phase` |
+| `CLAUDE.md` | Code conventions, frameworks, test commands for Claude Code |
+| `.gitignore` | Updated with `.planning/codebase/` and `.planning/research/` |
+
+Auto-detected metadata:
+- **Primary language** (TypeScript, Python, Rust, Go, etc.)
+- **Package manager** (npm, pnpm, yarn, bun, pip, cargo, go)
+- **Frameworks** (React, Next.js, Express, Django, FastAPI, etc.)
+- **Test framework** (vitest, jest, pytest, etc.)
+- **Build & test commands** (extracted from package.json / Cargo.toml / etc.)
+
+Skip this phase with `--skip-gsd` if you already have a GSD project set up.
+
+#### Phase 2: Ruflo Memory Seeding
+
+Scans the codebase and stores knowledge in Ruflo memory:
 
 | Memory Key | What It Captures |
 |-----------|-----------------|
@@ -125,6 +150,8 @@ This scans and stores:
 | `test-patterns` | Test framework, test locations, test count |
 | `git-history` | Recent commits, hot files, contributors |
 | `doc-*` | README, CLAUDE.md, CONTRIBUTING.md |
+| `gsd-project` | Generated PROJECT.md (so agents know the setup) |
+| `gsd-roadmap` | Phase roadmap (so agents know what's planned) |
 
 **Deep mode** (`--deep`) also captures:
 
@@ -140,6 +167,7 @@ Agents can then query this at any time:
 ```bash
 npx claude-flow@v3alpha memory search --namespace project-memory --query "test framework"
 npx claude-flow@v3alpha memory search --namespace project-memory --query "architecture"
+npx claude-flow@v3alpha memory search --namespace project-memory --query "roadmap"
 ```
 
 ### Step 1-4: Run It
